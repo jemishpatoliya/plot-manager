@@ -145,3 +145,26 @@
 .animate-slide-in {
   animation: slideIn 0.3s ease-out forwards;
 }
+
+/* ================================
+   MOBILE LAYOUT SCALE FIX
+   (Image + Plot overlays together)
+   SAFE: does NOT change positions
+================================ */
+
+@media (max-width: 768px) {
+  .layout-wrapper {
+    transform: scale(0.55);
+    transform-origin: top left;
+    width: 180vw;
+    height: auto;
+  }
+}
+
+/* Extra safety for very small phones */
+@media (max-width: 480px) {
+  .layout-wrapper {
+    transform: scale(0.45);
+    width: 220vw;
+  }
+}
