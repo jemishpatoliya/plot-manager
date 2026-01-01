@@ -16,6 +16,10 @@ export default defineConfig(({ mode }) => {
         '/api': 'http://localhost:5000',
       },
     },
+    preview: {
+      host: true,
+      allowedHosts: true,
+    },
     plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
     resolve: {
       alias: {
