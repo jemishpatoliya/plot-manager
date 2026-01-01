@@ -21,6 +21,14 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
+const apiUrl = (path: string) => {
+  const base = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim();
+  if (!base) return path;
+  const baseNoSlash = base.endsWith('/') ? base.slice(0, -1) : base;
+  const pathWithSlash = path.startsWith('/') ? path : `/${path}`;
+  return `${baseNoSlash}${pathWithSlash}`;
+};
+
 // Fixed admin credentials
 const ADMIN_EMAIL = 'admin@gmail.com';
 const ADMIN_PASSWORD = 'admin@123';
@@ -44,7 +52,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     (async () => {
       try {
-        const health = await fetch('/api/health');
+        const health = await fetch(apiUrl('/api/health'));
         if (!health.ok) throw new Error('health not ok');
         const healthJson = (await health.json()) as { dbReady?: boolean };
         if (!healthJson?.dbReady) {
@@ -55,7 +63,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (cancelled) return;
         setApiAvailable(true);
 
-        const res = await fetch('/api/projects');
+        const res = await fetch(apiUrl('/api/projects'));
         if (!res.ok) throw new Error('projects not ok');
         const data = (await res.json()) as Project[];
         if (cancelled) return;
@@ -129,7 +137,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (e === ADMIN_EMAIL) return false;
 
     try {
-      const res = await fetch('/api/auth/register', {
+      const res = await fetch(apiUrl('/api/auth/register'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: e, password }),
@@ -145,7 +153,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (!e || !password) return false;
 
     try {
-      const res = await fetch('/api/auth/login', {
+      const res = await fetch(apiUrl('/api/auth/login'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: e, password }),
@@ -174,7 +182,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setProjects((prev) => [...prev, newProject]);
 
     if (apiAvailable) {
-      fetch('/api/projects', {
+      fetch(apiUrl('/api/projects'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newProject),
@@ -191,7 +199,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
 
     if (apiAvailable) {
-      fetch(`/api/projects/${id}`,
+      fetch(apiUrl(`/api/projects/${id}`),
         {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -208,7 +216,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
 
     if (apiAvailable) {
-      fetch(`/api/projects/${id}`, { method: 'DELETE' }).catch(() => {});
+      fetch(apiUrl(`/api/projects/${id}`), { method: 'DELETE' }).catch(() => {});
     }
   };
 
@@ -227,7 +235,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (apiAvailable) {
       const proj = projects.find((p) => p.id === projectId);
       if (proj) {
-        fetch(`/api/projects/${projectId}`, {
+        fetch(apiUrl(`/api/projects/${projectId}`), {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ plots: [...proj.plots, plot] }),
@@ -268,7 +276,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const nextPlots = proj.plots.map((plot) =>
           plot.id === plotId ? { ...plot, ...updates } : plot
         );
-        fetch(`/api/projects/${projectId}`, {
+        fetch(apiUrl(`/api/projects/${projectId}`), {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ plots: nextPlots }),
@@ -297,7 +305,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const proj = projects.find((p) => p.id === projectId);
       if (proj) {
         const nextPlots = proj.plots.filter((plot) => plot.id !== plotId);
-        fetch(`/api/projects/${projectId}`, {
+        fetch(apiUrl(`/api/projects/${projectId}`), {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ plots: nextPlots }),
