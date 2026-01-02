@@ -64,6 +64,8 @@ export default function ProjectCard({ project, onClick }: ProjectCardProps) {
         // Try to resolve the custom image
         const next = await makeObjectUrlFromRef(raw);
         if (cancelled) return;
+        
+        console.log('ProjectCard image resolution result:', { raw, next });
 
         // If URL resolution failed (e.g., S3 error), use fallback
         if (!next && raw.startsWith('s3:')) {
@@ -186,15 +188,19 @@ export default function ProjectCard({ project, onClick }: ProjectCardProps) {
           <img
             src={resolvedLayoutImage}
             alt={project.name}
-            className={`w-full h-full object-cover transform transition-all duration-500 group-hover:scale-110 ${
-              imageLoading ? 'opacity-0' : 'opacity-100'
-            }`}
-            onLoad={() => setImageLoading(false)}
-            onError={() => {
+            onLoad={() => {
+              console.log('ProjectCard image loaded successfully:', resolvedLayoutImage);
+              setImageLoading(false);
+            }}
+            onError={(e) => {
+              console.error('ProjectCard image failed to load:', resolvedLayoutImage, e);
               setImageError(true);
               setImageLoading(false);
               setResolvedLayoutImage(sampleLayout);
             }}
+            className={`w-full h-full object-cover transform transition-all duration-500 group-hover:scale-110 ${
+              imageLoading ? 'opacity-0' : 'opacity-100'
+            }`}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-card via-card/20 to-transparent" />
           
