@@ -16,17 +16,26 @@ const getSignedUrlForS3Ref = async (ref: string) => {
   const cached = signedUrlCache.get(ref);
   if (cached && Date.now() < cached.expiresAt) return cached.url;
 
-  const res = await fetch(
-    apiUrl(`/api/storage/signed-url?key=${encodeURIComponent(ref)}`)
-  );
-  if (!res.ok) {
-    throw new Error('Could not resolve image');
-  }
-  const data = (await res.json()) as { url?: string };
-  if (!data?.url) throw new Error('Could not resolve image');
+  try {
+    const res = await fetch(
+      apiUrl(`/api/storage/signed-url?key=${encodeURIComponent(ref)}`)
+    );
+    if (!res.ok) {
+      console.warn('Failed to get signed URL, response not ok:', res.status, res.statusText);
+      throw new Error('Could not resolve image');
+    }
+    const data = (await res.json()) as { url?: string };
+    if (!data?.url) {
+      console.warn('No URL in signed URL response');
+      throw new Error('Could not resolve image');
+    }
 
-  signedUrlCache.set(ref, { url: data.url, expiresAt: Date.now() + 4 * 60 * 1000 });
-  return data.url;
+    signedUrlCache.set(ref, { url: data.url, expiresAt: Date.now() + 4 * 60 * 1000 });
+    return data.url;
+  } catch (error) {
+    console.error('Error getting signed URL for S3 reference:', ref, error);
+    throw error;
+  }
 };
 
 const openDb = () =>
@@ -89,7 +98,13 @@ export const storeDataUrlImage = async (dataUrl: string, key: string) => {
 export const makeObjectUrlFromRef = async (ref: string) => {
   try {
     if (ref.startsWith('s3:')) {
-      return await getSignedUrlForS3Ref(ref);
+      try {
+        return await getSignedUrlForS3Ref(ref);
+      } catch (s3Error) {
+        console.warn('S3 URL resolution failed, using fallback:', s3Error);
+        // Return a fallback URL or empty string
+        return '';
+      }
     }
     if (!ref.startsWith('idb:')) return ref;
     
@@ -101,6 +116,7 @@ export const makeObjectUrlFromRef = async (ref: string) => {
     return URL.createObjectURL(blob);
   } catch (error) {
     console.warn('Failed to resolve image reference:', ref, error);
-    throw error;
+    // Return empty string instead of throwing to prevent map crashes
+    return '';
   }
 };

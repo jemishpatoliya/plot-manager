@@ -139,12 +139,21 @@ export default function ProjectMap() {
         const url = await makeObjectUrlFromRef(imageUrl);
         if (cancelled) return;
         nextObjectUrl = url;
-        setResolvedImageUrl(url);
+        
+        // If URL resolution failed, use fallback
+        if (!url && imageUrl.startsWith('s3:')) {
+          console.warn('S3 image failed to load, using fallback image');
+          setResolvedImageUrl('/aradhana.png');
+        } else {
+          setResolvedImageUrl(url);
+        }
+        
         setIsImageLoading(false);
       } catch (error) {
         console.warn('Failed to resolve map image:', error);
         if (cancelled) return;
-        setResolvedImageUrl('');
+        // Use fallback image on error
+        setResolvedImageUrl('/aradhana.png');
         setIsImageLoading(false);
       }
     })();
@@ -215,7 +224,7 @@ export default function ProjectMap() {
     const LAYER_ID = 'project-image-layer';
 
     const applyUpdate = () => {
-      if (!imageUrl || isImageLoading) {
+      if (!imageUrl || isImageLoading || !resolvedImageUrl) {
         if (map.getLayer(LAYER_ID)) map.removeLayer(LAYER_ID);
         if (map.getSource(SOURCE_ID)) map.removeSource(SOURCE_ID);
         markersRef.current.forEach((m) => m.remove());

@@ -65,6 +65,15 @@ export default function ProjectCard({ project, onClick }: ProjectCardProps) {
         const next = await makeObjectUrlFromRef(raw);
         if (cancelled) return;
 
+        // If URL resolution failed (e.g., S3 error), use fallback
+        if (!next && raw.startsWith('s3:')) {
+          console.warn('S3 image failed to load for project card, using fallback');
+          if (cancelled) return;
+          setResolvedLayoutImage(sampleLayout);
+          setImageLoading(false);
+          return;
+        }
+
         if (next && next.startsWith('blob:')) {
           if (objectUrlRef.current && objectUrlRef.current !== next) {
             URL.revokeObjectURL(objectUrlRef.current);
