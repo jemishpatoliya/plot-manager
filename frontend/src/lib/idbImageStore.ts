@@ -99,7 +99,6 @@ export const makeObjectUrlFromRef = async (ref: string) => {
   try {
     if (ref.startsWith('s3:')) {
       try {
-        console.log('Attempting to resolve S3 URL:', ref);
         return await getSignedUrlForS3Ref(ref);
       } catch (s3Error) {
         console.warn('S3 URL resolution failed, using fallback:', s3Error);

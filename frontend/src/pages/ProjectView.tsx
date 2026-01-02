@@ -9,6 +9,7 @@ import AddPlotDialog from '@/components/AddPlotDialog';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, MapPin, Grid3X3, Edit2, Eye } from 'lucide-react';
 import { makeObjectUrlFromRef } from '@/lib/idbImageStore';
+import sampleLayout from '@/assets/sample-layout.png';
 
 const apiUrl = (path: string) => {
   const base = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim();
@@ -23,7 +24,7 @@ export default function ProjectView() {
   const { projects, currentProject, setCurrentProject, isAdmin } = useApp();
   const navigate = useNavigate();
   const [editMode, setEditMode] = useState(false);
-  const [resolvedLayoutImage, setResolvedLayoutImage] = useState<string>('');
+  const [resolvedLayoutImage, setResolvedLayoutImage] = useState<string>(sampleLayout);
   const objectUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -55,7 +56,7 @@ export default function ProjectView() {
       try {
         const raw = currentProject?.layoutImage || '';
         if (!raw) {
-          if (!cancelled) setResolvedLayoutImage('');
+          if (!cancelled) setResolvedLayoutImage(sampleLayout);
           return;
         }
 
@@ -72,10 +73,10 @@ export default function ProjectView() {
           objectUrlRef.current = null;
         }
 
-        setResolvedLayoutImage(next);
+        setResolvedLayoutImage(next || sampleLayout);
       } catch {
         if (cancelled) return;
-        setResolvedLayoutImage('');
+        setResolvedLayoutImage(sampleLayout);
       }
     })();
 
@@ -195,7 +196,7 @@ export default function ProjectView() {
         {/* Layout Viewer */}
         <div className="bg-card border border-border rounded-2xl sm:p-4 overflow-hidden shadow-sm -mx-4 px-4 sm:mx-0 sm:px-0">
           <PlotOverlayEditor
-            layoutImage={resolvedLayoutImage || currentProject.layoutImage}
+            layoutImage={resolvedLayoutImage}
             plots={currentProject.plots}
             projectId={currentProject.id}
             project={currentProject}

@@ -64,8 +64,6 @@ export default function ProjectCard({ project, onClick }: ProjectCardProps) {
         // Try to resolve the custom image
         const next = await makeObjectUrlFromRef(raw);
         if (cancelled) return;
-        
-        console.log('ProjectCard image resolution result:', { raw, next });
 
         // If URL resolution failed (e.g., S3 error), use fallback
         if (!next && raw.startsWith('s3:')) {
@@ -189,11 +187,9 @@ export default function ProjectCard({ project, onClick }: ProjectCardProps) {
             src={resolvedLayoutImage}
             alt={project.name}
             onLoad={() => {
-              console.log('ProjectCard image loaded successfully:', resolvedLayoutImage);
               setImageLoading(false);
             }}
             onError={(e) => {
-              console.error('ProjectCard image failed to load:', resolvedLayoutImage, e);
               setImageError(true);
               setImageLoading(false);
               setResolvedLayoutImage(sampleLayout);

@@ -135,17 +135,12 @@ export default function ProjectMap() {
 
     (async () => {
       setIsImageLoading(true);
-      console.log('Starting image resolution for:', imageUrl);
       try {
         const url = await makeObjectUrlFromRef(imageUrl);
         if (cancelled) return;
         nextObjectUrl = url;
-        
-        console.log('Image resolution result:', url);
-        
-        // If URL resolution failed, use fallback
+
         if (!url && imageUrl.startsWith('s3:')) {
-          console.warn('S3 image failed to load, using fallback image');
           setResolvedImageUrl('/aradhana.png');
         } else {
           setResolvedImageUrl(url);
@@ -227,18 +222,13 @@ export default function ProjectMap() {
     const LAYER_ID = 'project-image-layer';
 
     const applyUpdate = () => {
-      console.log('Map applyUpdate called:', { imageUrl, isImageLoading, resolvedImageUrl });
-      
       if (!imageUrl || isImageLoading || !resolvedImageUrl) {
-        console.log('Skipping map update - conditions not met:', { imageUrl, isImageLoading, resolvedImageUrl });
         if (map.getLayer(LAYER_ID)) map.removeLayer(LAYER_ID);
         if (map.getSource(SOURCE_ID)) map.removeSource(SOURCE_ID);
         markersRef.current.forEach((m) => m.remove());
         markersRef.current = [];
         return;
       }
-
-      console.log('Proceeding with map update, resolvedImageUrl:', resolvedImageUrl);
 
       const orderedRaw = orderImageCoords(rawCorners);
       const coords = applyCornerFlip(orderedRaw, flipH, flipV);
@@ -250,13 +240,11 @@ export default function ProjectMap() {
 
         if (src && (canUpdateImage || canSetCoordinates)) {
           if (canUpdateImage) {
-            console.log('Updating existing image source with URL:', resolvedImageUrl);
             src.updateImage?.({ url: resolvedImageUrl, coordinates: coords });
           } else {
             src.setCoordinates?.(coords);
             if (map.getLayer(LAYER_ID)) map.removeLayer(LAYER_ID);
             map.removeSource(SOURCE_ID);
-            console.log('Adding new image source with URL:', resolvedImageUrl);
             map.addSource(SOURCE_ID, {
               type: 'image',
               url: resolvedImageUrl,
@@ -266,7 +254,6 @@ export default function ProjectMap() {
         } else {
           if (map.getLayer(LAYER_ID)) map.removeLayer(LAYER_ID);
           if (map.getSource(SOURCE_ID)) map.removeSource(SOURCE_ID);
-          console.log('Adding new image source with URL:', resolvedImageUrl);
           map.addSource(SOURCE_ID, {
             type: 'image',
             url: resolvedImageUrl,
@@ -482,17 +469,6 @@ export default function ProjectMap() {
     );
   }
 
-  if (isImageLoading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-          <div className="text-muted-foreground">Loading map...</div>
-        </div>
-      </div>
-    );
-  }
-
   if (!isAdmin && !currentProject.mapConfig && !currentProject.layoutImage) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-6">
@@ -520,6 +496,25 @@ export default function ProjectMap() {
           height: '100vh',
         }}
       />
+
+      {isImageLoading && (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(0,0,0,0.25)',
+            zIndex: 9,
+          }}
+        >
+          <div className="flex flex-col items-center gap-4">
+            <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            <div className="text-muted-foreground">Loading map...</div>
+          </div>
+        </div>
+      )}
 
       <div style={{ position: 'absolute', top: 12, right: 12, zIndex: 10, display: 'flex', gap: 8 }}>
         <Button variant="outline" onClick={() => navigate(`/project/${currentProject.id}`)}>
