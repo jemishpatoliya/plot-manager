@@ -108,7 +108,8 @@ export default function ProjectMap() {
   }, [currentProject]);
 
   const [imageUrl, setImageUrl] = useState<string>(initialImageUrl);
-  const [resolvedImageUrl, setResolvedImageUrl] = useState<string>(initialImageUrl);
+  const [resolvedImageUrl, setResolvedImageUrl] = useState<string>('');
+  const [isImageLoading, setIsImageLoading] = useState(true);
   const [opacity, setOpacity] = useState<number>(1);
   const [flipH, setFlipH] = useState(false);
   const [flipV, setFlipV] = useState(false);
@@ -133,14 +134,18 @@ export default function ProjectMap() {
     const prevUrl = resolvedImageUrl;
 
     (async () => {
+      setIsImageLoading(true);
       try {
         const url = await makeObjectUrlFromRef(imageUrl);
         if (cancelled) return;
         nextObjectUrl = url;
         setResolvedImageUrl(url);
-      } catch {
+        setIsImageLoading(false);
+      } catch (error) {
+        console.warn('Failed to resolve map image:', error);
         if (cancelled) return;
         setResolvedImageUrl('');
+        setIsImageLoading(false);
       }
     })();
 
@@ -210,7 +215,7 @@ export default function ProjectMap() {
     const LAYER_ID = 'project-image-layer';
 
     const applyUpdate = () => {
-      if (!imageUrl) {
+      if (!imageUrl || isImageLoading) {
         if (map.getLayer(LAYER_ID)) map.removeLayer(LAYER_ID);
         if (map.getSource(SOURCE_ID)) map.removeSource(SOURCE_ID);
         markersRef.current.forEach((m) => m.remove());
@@ -221,68 +226,77 @@ export default function ProjectMap() {
       const orderedRaw = orderImageCoords(rawCorners);
       const coords = applyCornerFlip(orderedRaw, flipH, flipV);
 
-      const src = map.getSource(SOURCE_ID) as MapboxImageSource | undefined;
-      const canUpdateImage = Boolean(src && typeof src.updateImage === 'function');
-      const canSetCoordinates = Boolean(src && typeof src.setCoordinates === 'function');
+      try {
+        const src = map.getSource(SOURCE_ID) as MapboxImageSource | undefined;
+        const canUpdateImage = Boolean(src && typeof src.updateImage === 'function');
+        const canSetCoordinates = Boolean(src && typeof src.setCoordinates === 'function');
 
-      if (src && (canUpdateImage || canSetCoordinates)) {
-        if (canUpdateImage) {
-          src.updateImage?.({ url: resolvedImageUrl, coordinates: coords });
+        if (src && (canUpdateImage || canSetCoordinates)) {
+          if (canUpdateImage) {
+            src.updateImage?.({ url: resolvedImageUrl, coordinates: coords });
+          } else {
+            src.setCoordinates?.(coords);
+            if (map.getLayer(LAYER_ID)) map.removeLayer(LAYER_ID);
+            map.removeSource(SOURCE_ID);
+            map.addSource(SOURCE_ID, {
+              type: 'image',
+              url: resolvedImageUrl,
+              coordinates: coords,
+            });
+          }
         } else {
-          src.setCoordinates?.(coords);
           if (map.getLayer(LAYER_ID)) map.removeLayer(LAYER_ID);
-          map.removeSource(SOURCE_ID);
+          if (map.getSource(SOURCE_ID)) map.removeSource(SOURCE_ID);
           map.addSource(SOURCE_ID, {
             type: 'image',
             url: resolvedImageUrl,
             coordinates: coords,
           });
         }
-      } else {
+
+        if (!map.getLayer(LAYER_ID)) {
+          map.addLayer({
+            id: LAYER_ID,
+            source: SOURCE_ID,
+            type: 'raster',
+            paint: { 'raster-opacity': opacity },
+          });
+        } else {
+          map.setPaintProperty(LAYER_ID, 'raster-opacity', opacity);
+        }
+
+        if (!isAdmin) return;
+
+        const colors = ['#ff3b30', '#34c759', '#007aff', '#ffcc00'];
+        if (markersRef.current.length === 0) {
+          markersRef.current = coords.map((c, idx) => {
+            const marker = new mapboxgl.Marker({ draggable: true, color: colors[idx] })
+              .setLngLat(c as unknown as LngLatLike)
+              .addTo(map);
+
+            marker.on('dragend', () => {
+              const next = markersRef.current.map((m) => {
+                const ll = m.getLngLat();
+                return [ll.lng, ll.lat] as LngLatTuple;
+              }) as unknown as Corners4;
+
+              setRawCorners(orderImageCoords(applyCornerFlip(next, flipH, flipV)));
+            });
+
+            return marker;
+          });
+        } else {
+          markersRef.current.forEach((m, idx) => {
+            if (coords[idx]) m.setLngLat(coords[idx] as unknown as LngLatLike);
+          });
+        }
+      } catch (error) {
+        console.error('Failed to update map image:', error);
+        // Clean up on error
         if (map.getLayer(LAYER_ID)) map.removeLayer(LAYER_ID);
         if (map.getSource(SOURCE_ID)) map.removeSource(SOURCE_ID);
-        map.addSource(SOURCE_ID, {
-          type: 'image',
-          url: resolvedImageUrl,
-          coordinates: coords,
-        });
-      }
-
-      if (!map.getLayer(LAYER_ID)) {
-        map.addLayer({
-          id: LAYER_ID,
-          source: SOURCE_ID,
-          type: 'raster',
-          paint: { 'raster-opacity': opacity },
-        });
-      } else {
-        map.setPaintProperty(LAYER_ID, 'raster-opacity', opacity);
-      }
-
-      if (!isAdmin) return;
-
-      const colors = ['#ff3b30', '#34c759', '#007aff', '#ffcc00'];
-      if (markersRef.current.length === 0) {
-        markersRef.current = coords.map((c, idx) => {
-          const marker = new mapboxgl.Marker({ draggable: true, color: colors[idx] })
-            .setLngLat(c as unknown as LngLatLike)
-            .addTo(map);
-
-          marker.on('dragend', () => {
-            const next = markersRef.current.map((m) => {
-              const ll = m.getLngLat();
-              return [ll.lng, ll.lat] as LngLatTuple;
-            }) as unknown as Corners4;
-
-            setRawCorners(orderImageCoords(applyCornerFlip(next, flipH, flipV)));
-          });
-
-          return marker;
-        });
-      } else {
-        markersRef.current.forEach((m, idx) => {
-          if (coords[idx]) m.setLngLat(coords[idx] as unknown as LngLatLike);
-        });
+        markersRef.current.forEach((m) => m.remove());
+        markersRef.current = [];
       }
     };
 
@@ -292,7 +306,7 @@ export default function ProjectMap() {
     }
 
     map.once('load', applyUpdate);
-  }, [imageUrl, opacity, rawCorners, flipH, flipV, isAdmin]);
+  }, [imageUrl, resolvedImageUrl, isImageLoading, opacity, rawCorners, flipH, flipV, isAdmin]);
 
   const onUploadFile = (file: File | undefined) => {
     if (!file) return;
@@ -375,6 +389,7 @@ export default function ProjectMap() {
     if (!map) return;
     if (!currentProject) return;
     if (!imageUrl) return;
+    if (isImageLoading) return;
     if (didInitialFitRef.current) return;
 
     const run = () => {
@@ -403,7 +418,7 @@ export default function ProjectMap() {
     }
 
     map.once('load', run);
-  }, [currentProject, imageUrl, rawCorners, flipH, flipV]);
+  }, [currentProject, imageUrl, isImageLoading, rawCorners, flipH, flipV]);
 
   const handleSave = () => {
     if (!currentProject) return;
@@ -439,7 +454,21 @@ export default function ProjectMap() {
   if (!currentProject) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-muted-foreground">Loading...</div>
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          <div className="text-muted-foreground">Loading project...</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (isImageLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          <div className="text-muted-foreground">Loading map...</div>
+        </div>
       </div>
     );
   }
