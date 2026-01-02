@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { ComponentType } from 'react';
 import { Plot, PlotStatus, Project } from '@/types';
 import { STATUS_COLORS, formatCurrency, formatDate } from '@/lib/plotUtils';
 import { Button } from '@/components/ui/button';
@@ -46,7 +47,15 @@ export default function PlotModal({ plot, project, isAdmin, onClose, onUpdate, o
     toast.success('Plot deleted successfully');
   };
 
-  const DetailRow = ({ icon: Icon, label, value }: { icon: any; label: string; value: string | number }) => (
+  const DetailRow = ({
+    icon: Icon,
+    label,
+    value,
+  }: {
+    icon: ComponentType<{ className?: string }>;
+    label: string;
+    value: string | number;
+  }) => (
     <div className="flex items-center gap-3 py-2">
       <Icon className="w-4 h-4 text-muted-foreground flex-shrink-0" />
       <span className="text-muted-foreground text-sm w-24">{label}</span>

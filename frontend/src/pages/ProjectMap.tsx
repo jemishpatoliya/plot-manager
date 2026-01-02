@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import mapboxgl, { type LngLatLike, type Map as MapboxMap, type Marker } from 'mapbox-gl';
+import mapboxgl, { type AnySourceData, type LngLatLike, type Map as MapboxMap, type Marker } from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { useApp } from '@/context/AppContext';
 import boundary from '@/lib/aradhanaBoundary';
@@ -191,7 +191,7 @@ export default function ProjectMap() {
 
     map.on('load', () => {
       if (!map.getSource('boundary')) {
-        map.addSource('boundary', { type: 'geojson', data: boundary as any });
+        map.addSource('boundary', ({ type: 'geojson', data: boundary } as unknown) as AnySourceData);
       }
       if (!map.getLayer('boundary-mask')) {
         map.addLayer({

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import mapboxgl, { type LngLatLike, type Map as MapboxMap, type Marker } from 'mapbox-gl';
+import mapboxgl, { type AnySourceData, type LngLatLike, type Map as MapboxMap, type Marker } from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import boundary from '@/lib/aradhanaBoundary';
 import { useApp } from '@/context/AppContext';
@@ -234,7 +234,8 @@ export default function AradhanaMap() {
       };
 
       const startZoomSequence = async () => {
-        const flyToAsync = (options: any) =>
+        type FlyToOptions = Parameters<MapboxMap['flyTo']>[0];
+        const flyToAsync = (options: FlyToOptions) =>
           new Promise<void>((resolve) => {
             map.once('moveend', () => resolve());
             map.flyTo(options);
@@ -272,7 +273,7 @@ export default function AradhanaMap() {
         const imgCoords = orderImageCoords(DEFAULT_LAND_CORNERS);
 
         if (!map.getSource('boundary')) {
-          map.addSource('boundary', { type: 'geojson', data: boundary as any });
+          map.addSource('boundary', ({ type: 'geojson', data: boundary } as unknown) as AnySourceData);
         }
         if (!map.getLayer('boundary-mask')) {
           map.addLayer({

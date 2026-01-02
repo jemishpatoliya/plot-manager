@@ -1,4 +1,5 @@
 import { useState, useRef, MouseEvent as ReactMouseEvent, useEffect } from 'react';
+import type { PointerEvent as ReactPointerEvent } from 'react';
 import { Plot, Project } from '@/types';
 import { STATUS_COLORS } from '@/lib/plotUtils';
 import { useApp } from '@/context/AppContext';
@@ -76,7 +77,7 @@ export default function PlotOverlayEditor({
     return { dist, mid };
   };
 
-  const onPointerDown = (e: React.PointerEvent) => {
+  const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (editMode) return;
     if (e.pointerType !== 'touch') return;
     const vp = viewportRef.current;
@@ -112,7 +113,7 @@ export default function PlotOverlayEditor({
     }
   };
 
-  const onPointerMove = (e: React.PointerEvent) => {
+  const onPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (editMode) return;
     if (e.pointerType !== 'touch') return;
     const vp = viewportRef.current;
@@ -149,7 +150,7 @@ export default function PlotOverlayEditor({
     }
   };
 
-  const onPointerUpOrCancel = (e: React.PointerEvent) => {
+  const onPointerUpOrCancel = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (editMode) return;
     if (e.pointerType !== 'touch') return;
     pointersRef.current.delete(e.pointerId);
@@ -228,7 +229,7 @@ export default function PlotOverlayEditor({
     const deltaX = ((e.clientX - dragStart.x) / rect.width) * 100;
     const deltaY = ((e.clientY - dragStart.y) / rect.height) * 100;
 
-    let newBounds = { ...initialBounds };
+    const newBounds = { ...initialBounds };
 
     if (dragMode === 'move') {
       newBounds.x = Math.max(0, Math.min(100 - newBounds.width, initialBounds.x + deltaX));
