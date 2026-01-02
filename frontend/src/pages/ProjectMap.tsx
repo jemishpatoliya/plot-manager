@@ -73,7 +73,7 @@ const applyCornerFlip = (coords: Corners4, flipH: boolean, flipV: boolean): Corn
 export default function ProjectMap() {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
-  const { projects, currentProject, setCurrentProject, updateProject, isAdmin } = useApp();
+  const { projects, currentProject, setCurrentProject, updateProject, isAdmin, user } = useApp();
 
   const mapContainer = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapboxMap | null>(null);
@@ -337,7 +337,10 @@ export default function ProjectMap() {
 
         const presign = await fetch(apiUrl('/api/storage/presign-upload'), {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(user?.token ? { Authorization: `Bearer ${user.token}` } : {}),
+          },
           body: JSON.stringify({ contentType: file.type, prefix: 'project-maps', ext }),
         });
         if (!presign.ok) throw new Error('Could not prepare upload');
@@ -516,7 +519,19 @@ export default function ProjectMap() {
         </div>
       )}
 
-      <div style={{ position: 'absolute', top: 12, right: 12, zIndex: 10, display: 'flex', gap: 8 }}>
+      <div
+        style={{
+          position: 'absolute',
+          top: 12,
+          right: 12,
+          zIndex: 10,
+          display: 'flex',
+          flexWrap: 'wrap',
+          justifyContent: 'flex-end',
+          gap: 8,
+          maxWidth: 'calc(100vw - 24px)',
+        }}
+      >
         <Button variant="outline" onClick={() => navigate(`/project/${currentProject.id}`)}>
           Back
         </Button>

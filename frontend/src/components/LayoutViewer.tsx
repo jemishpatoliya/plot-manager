@@ -38,18 +38,18 @@ export default function LayoutViewer({
 
   return (
     /* 🔥 NO CARD WIDTH / NO SIDE MARGIN */
-    <div className="relative w-screen overflow-x-auto">
+    <div className="relative w-full overflow-x-auto">
       {/* 🔒 IMAGE + OVERLAY AREA */}
       <div
         ref={containerRef}
-        className="relative w-screen mx-auto"
+        className="relative w-full mx-auto"
       >
         {/* IMAGE — FULL WIDTH, HEIGHT AUTO */}
         <img
           src={layoutImage}
           alt="Layout Plan"
           draggable={false}
-          className="block w-screen h-auto select-none"
+          className="block w-full h-auto select-none"
         />
 
         {/* OVERLAYS — PERFECTLY LOCKED */}

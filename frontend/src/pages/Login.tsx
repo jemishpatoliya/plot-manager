@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Link } from 'react-router-dom';
 import { useApp } from '@/context/AppContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -115,11 +114,6 @@ export default function Login() {
               )}
             </Button>
           </form>
-
-          <p className="text-center text-sm text-muted-foreground mt-6">
-            Don&apos;t have an account?{' '}
-            <Link to="/register" className="text-primary hover:underline">Create one</Link>
-          </p>
         </div>
 
         {/* Footer */}

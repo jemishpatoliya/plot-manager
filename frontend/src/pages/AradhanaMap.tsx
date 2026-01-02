@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import mapboxgl, { type LngLatLike, type Map as MapboxMap, type Marker } from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import boundary from '@/lib/aradhanaBoundary';
 import { useApp } from '@/context/AppContext';
+import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { makeObjectUrlFromRef, storeFileImage } from '@/lib/idbImageStore';
 
@@ -62,6 +64,7 @@ const applyCornerFlip = (coords: LngLatTuple[], flipH: boolean, flipV: boolean) 
 
 export default function AradhanaMap() {
   const { projects, updateProject, isAdmin } = useApp();
+  const navigate = useNavigate();
   const mapContainer = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapboxMap | null>(null);
   const rafRef = useRef<number | null>(null);
@@ -537,6 +540,24 @@ export default function AradhanaMap() {
 
   const token = import.meta.env.VITE_MAPBOX_TOKEN;
 
+  if (!isAdmin) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-6">
+        <div className="max-w-lg text-center">
+          <div className="text-xl font-semibold text-foreground">Admin only</div>
+          <div className="mt-2 text-sm text-muted-foreground">
+            This tool is available only for admin.
+          </div>
+          <div className="mt-6 flex justify-center">
+            <Button variant="outline" onClick={() => navigate('/dashboard')}>
+              Back
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (!token) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-6">
@@ -567,7 +588,9 @@ export default function AradhanaMap() {
           position: 'absolute',
           top: 12,
           left: 12,
-          width: 360,
+          width: 'min(360px, calc(100vw - 24px))',
+          maxHeight: 'calc(100vh - 24px)',
+          overflowY: 'auto',
           padding: 12,
           borderRadius: 10,
           background: 'rgba(0,0,0,0.65)',

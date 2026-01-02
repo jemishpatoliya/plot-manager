@@ -129,7 +129,7 @@ export default function ProjectView() {
               <h1 className="text-2xl md:text-3xl font-bold text-foreground">
                 {currentProject.name}
               </h1>
-              <div className="flex items-center gap-4 mt-2 text-muted-foreground">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-4 mt-2 text-muted-foreground">
                 <div className="flex items-center gap-1">
                   <MapPin className="w-4 h-4" />
                   <span className="text-sm">{currentProject.location}</span>

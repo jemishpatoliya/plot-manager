@@ -9,7 +9,6 @@ interface AppContextType {
   isAdmin: boolean;
   isInitialized: boolean;
   setCurrentProject: (project: Project | null) => void;
-  register: (email: string, password: string) => Promise<boolean>;
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
   addProject: (project: Omit<Project, 'id' | 'createdAt' | 'plots'>) => void;
@@ -158,22 +157,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [user]);
 
-  const register = async (email: string, password: string): Promise<boolean> => {
-    const e = email.trim().toLowerCase();
-    if (!e || !password) return false;
-
-    if (e === ADMIN_EMAIL) return false;
-
-    try {
-      const res = await fetch(apiUrl('/api/auth/register'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: e, password }),
-      });
-      return res.ok;
-    } catch {
-      return false;
-    }
+  const getAuthHeaders = () => {
+    const token = user?.token;
+    if (!token) return {} as Record<string, string>;
+    return { Authorization: `Bearer ${token}` };
   };
 
   const login = async (email: string, password: string): Promise<boolean> => {
@@ -189,7 +176,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (!res.ok) return false;
       const data = (await res.json()) as User;
       if (!data?.email || !data?.role) return false;
-      setUser({ id: data.id || (data.role === 'admin' ? '1' : '2'), email: data.email, role: data.role });
+      setUser({
+        id: data.id || (data.role === 'admin' ? '1' : '2'),
+        email: data.email,
+        role: data.role,
+        token: data.token,
+      });
       return true;
     } catch {
       return false;
@@ -201,6 +193,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const addProject = (project: Omit<Project, 'id' | 'createdAt' | 'plots'>) => {
+    if (user?.role !== 'admin') return;
     const newProject: Project = {
       ...project,
       id: Date.now().toString(),
@@ -212,13 +205,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (apiAvailable) {
       fetch(apiUrl('/api/projects'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify(newProject),
       }).catch(() => {});
     }
   };
 
   const updateProject = (id: string, updates: Partial<Project>) => {
+    if (user?.role !== 'admin') return;
     setProjects((prev) =>
       prev.map((p) => (p.id === id ? { ...p, ...updates } : p))
     );
@@ -230,7 +224,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       fetch(apiUrl(`/api/projects/${id}`),
         {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
           body: JSON.stringify(updates),
         }
       ).catch(() => {});
@@ -238,17 +232,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const deleteProject = (id: string) => {
+    if (user?.role !== 'admin') return;
     setProjects((prev) => prev.filter((p) => p.id !== id));
     if (currentProject?.id === id) {
       setCurrentProject(null);
     }
 
     if (apiAvailable) {
-      fetch(apiUrl(`/api/projects/${id}`), { method: 'DELETE' }).catch(() => {});
+      fetch(apiUrl(`/api/projects/${id}`), { method: 'DELETE', headers: { ...getAuthHeaders() } }).catch(() => {});
     }
   };
 
   const addPlot = (projectId: string, plot: Plot) => {
+    if (user?.role !== 'admin') return;
     setProjects((prev) =>
       prev.map((p) =>
         p.id === projectId ? { ...p, plots: [...p.plots, plot] } : p
@@ -265,7 +261,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (proj) {
         fetch(apiUrl(`/api/projects/${projectId}`), {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
           body: JSON.stringify({ plots: [...proj.plots, plot] }),
         }).catch(() => {});
       }
@@ -273,6 +269,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const updatePlot = (projectId: string, plotId: string, updates: Partial<Plot>) => {
+    if (user?.role !== 'admin') return;
     setProjects((prev) =>
       prev.map((p) =>
         p.id === projectId
@@ -306,7 +303,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         );
         fetch(apiUrl(`/api/projects/${projectId}`), {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
           body: JSON.stringify({ plots: nextPlots }),
         }).catch(() => {});
       }
@@ -314,6 +311,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const deletePlot = (projectId: string, plotId: string) => {
+    if (user?.role !== 'admin') return;
     setProjects((prev) =>
       prev.map((p) =>
         p.id === projectId
@@ -335,7 +333,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const nextPlots = proj.plots.filter((plot) => plot.id !== plotId);
         fetch(apiUrl(`/api/projects/${projectId}`), {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
           body: JSON.stringify({ plots: nextPlots }),
         }).catch(() => {});
       }
@@ -351,7 +349,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
         isAdmin: user?.role === 'admin',
         isInitialized,
         setCurrentProject,
-        register,
         login,
         logout,
         addProject,

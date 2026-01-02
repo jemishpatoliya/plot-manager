@@ -1,17 +1,16 @@
 import { useApp } from '@/context/AppContext';
 import { Button } from '@/components/ui/button';
-import { Building2, LayoutDashboard, LogIn, LogOut, User, Settings, UserPlus } from 'lucide-react';
-import { Link, useLocation } from 'react-router-dom';
+import { Building2, LayoutDashboard, LogIn, LogOut, User, Settings } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 export default function Header() {
   const { user, isAdmin, logout, currentProject, setCurrentProject } = useApp();
-  const location = useLocation();
 
   return (
     <header className="sticky top-0 z-40 w-full glass border-b border-border">
       <div className="container flex h-16 items-center justify-between px-4">
         {/* Logo & Breadcrumb */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 sm:gap-4 min-w-0">
           <Link 
             to={user ? "/dashboard" : "/"}
             onClick={() => setCurrentProject(null)}
@@ -26,7 +25,7 @@ export default function Header() {
           {currentProject && (
             <>
               <span className="text-muted-foreground">/</span>
-              <span className="text-foreground font-medium truncate max-w-[200px]">
+              <span className="text-foreground font-medium truncate max-w-[140px] sm:max-w-[200px]">
                 {currentProject.name}
               </span>
             </>
@@ -34,7 +33,7 @@ export default function Header() {
         </div>
 
         {/* Actions */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
           {user ? (
             <>
               <Link to="/dashboard">
@@ -78,12 +77,6 @@ export default function Header() {
                 <Button variant="outline" size="sm">
                   <LogIn className="w-4 h-4 mr-2" />
                   <span>Login</span>
-                </Button>
-              </Link>
-              <Link to="/register">
-                <Button size="sm">
-                  <UserPlus className="w-4 h-4 mr-2" />
-                  <span>Register</span>
                 </Button>
               </Link>
             </>

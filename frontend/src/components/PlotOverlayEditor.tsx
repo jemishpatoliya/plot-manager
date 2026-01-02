@@ -4,7 +4,7 @@ import { STATUS_COLORS } from '@/lib/plotUtils';
 import { useApp } from '@/context/AppContext';
 import PlotTooltip from './PlotTooltip';
 import PlotModal from './PlotModal';
-import { Lock, Unlock, Move, Maximize2 } from 'lucide-react';
+import { Lock, Unlock, Move, Maximize2, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface PlotOverlayEditorProps {
@@ -26,6 +26,8 @@ export default function PlotOverlayEditor({
 }: PlotOverlayEditorProps) {
   const { isAdmin, updatePlot, deletePlot } = useApp();
 
+  const [zoom, setZoom] = useState(1);
+
   const [hoveredPlot, setHoveredPlot] = useState<Plot | null>(null);
   const [selectedPlot, setSelectedPlot] = useState<Plot | null>(null);
   const [editingPlot, setEditingPlot] = useState<Plot | null>(null);
@@ -40,6 +42,137 @@ export default function PlotOverlayEditor({
   });
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
+
+  const pointersRef = useRef(new Map<number, { x: number; y: number }>());
+  const gestureRef = useRef<
+    | null
+    | {
+        mode: 'pan' | 'pinch';
+        startZoom: number;
+        startDist?: number;
+        startMid?: { x: number; y: number };
+        startScrollLeft: number;
+        startScrollTop: number;
+        startX?: number;
+        startY?: number;
+      }
+  >(null);
+
+  useEffect(() => {
+    setZoom(1);
+  }, [projectId, layoutImage]);
+
+  const clampZoom = (z: number) => Math.max(1, Math.min(4, Math.round(z * 100) / 100));
+
+  const getTwoPointerData = () => {
+    const pts = Array.from(pointersRef.current.values());
+    if (pts.length < 2) return null;
+    const [a, b] = pts;
+    const dx = a.x - b.x;
+    const dy = a.y - b.y;
+    const dist = Math.hypot(dx, dy);
+    const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    return { dist, mid };
+  };
+
+  const onPointerDown = (e: React.PointerEvent) => {
+    if (editMode) return;
+    if (e.pointerType !== 'touch') return;
+    const vp = viewportRef.current;
+    if (!vp) return;
+
+    (e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId);
+    pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    const count = pointersRef.current.size;
+
+    if (count === 1) {
+      gestureRef.current = {
+        mode: 'pan',
+        startZoom: zoom,
+        startScrollLeft: vp.scrollLeft,
+        startScrollTop: vp.scrollTop,
+        startX: e.clientX,
+        startY: e.clientY,
+      };
+    }
+
+    if (count === 2) {
+      const data = getTwoPointerData();
+      if (!data) return;
+      gestureRef.current = {
+        mode: 'pinch',
+        startZoom: zoom,
+        startDist: data.dist,
+        startMid: data.mid,
+        startScrollLeft: vp.scrollLeft,
+        startScrollTop: vp.scrollTop,
+      };
+    }
+  };
+
+  const onPointerMove = (e: React.PointerEvent) => {
+    if (editMode) return;
+    if (e.pointerType !== 'touch') return;
+    const vp = viewportRef.current;
+    if (!vp) return;
+
+    if (!pointersRef.current.has(e.pointerId)) return;
+    pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    const g = gestureRef.current;
+    if (!g) return;
+
+    if (pointersRef.current.size >= 2) {
+      const data = getTwoPointerData();
+      if (!data || !g.startDist || !g.startMid) return;
+
+      const ratio = data.dist / g.startDist;
+      const nextZoom = clampZoom(g.startZoom * ratio);
+      setZoom(nextZoom);
+
+      const zoomRatio = nextZoom / g.startZoom;
+      const midX = g.startMid.x;
+      const midY = g.startMid.y;
+
+      vp.scrollLeft = (g.startScrollLeft + midX) * zoomRatio - midX;
+      vp.scrollTop = (g.startScrollTop + midY) * zoomRatio - midY;
+      return;
+    }
+
+    if (pointersRef.current.size === 1 && g.mode === 'pan' && g.startX != null && g.startY != null) {
+      const dx = e.clientX - g.startX;
+      const dy = e.clientY - g.startY;
+      vp.scrollLeft = g.startScrollLeft - dx;
+      vp.scrollTop = g.startScrollTop - dy;
+    }
+  };
+
+  const onPointerUpOrCancel = (e: React.PointerEvent) => {
+    if (editMode) return;
+    if (e.pointerType !== 'touch') return;
+    pointersRef.current.delete(e.pointerId);
+
+    if (pointersRef.current.size === 0) {
+      gestureRef.current = null;
+      return;
+    }
+
+    if (pointersRef.current.size === 1) {
+      const vp = viewportRef.current;
+      if (!vp) return;
+      const remaining = Array.from(pointersRef.current.values())[0];
+      gestureRef.current = {
+        mode: 'pan',
+        startZoom: zoom,
+        startScrollLeft: vp.scrollLeft,
+        startScrollTop: vp.scrollTop,
+        startX: remaining?.x,
+        startY: remaining?.y,
+      };
+    }
+  };
 
   const handleMouseMove = (e: ReactMouseEvent, plot: Plot) => {
     if (dragMode !== 'none') return;
@@ -135,12 +268,54 @@ export default function PlotOverlayEditor({
 
   return (
     <div className="relative w-full h-full">
-      {/* MAIN CONTAINER */}
       <div
-        ref={containerRef}
-        className="relative w-full max-w-full overflow-hidden"
-        style={{ aspectRatio: '16 / 9' }}
+        className={
+          editMode
+            ? 'relative w-full max-w-full overflow-hidden'
+            : 'relative w-full max-w-full overflow-auto'
+        }
+        ref={viewportRef}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUpOrCancel}
+        onPointerCancel={onPointerUpOrCancel}
+        style={!editMode ? { touchAction: 'none' } : undefined}
       >
+        {!editMode && (
+          <div className="absolute top-2 right-2 z-20 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setZoom((z) => Math.min(4, Math.round((z + 0.25) * 100) / 100))}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border bg-background/90 shadow-sm"
+              aria-label="Zoom in"
+            >
+              <ZoomIn className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setZoom((z) => Math.max(1, Math.round((z - 0.25) * 100) / 100))}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border bg-background/90 shadow-sm"
+              aria-label="Zoom out"
+            >
+              <ZoomOut className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setZoom(1)}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border bg-background/90 shadow-sm"
+              aria-label="Reset zoom"
+            >
+              <RotateCcw className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+
+        {/* MAIN CONTAINER */}
+        <div
+          ref={containerRef}
+          className="relative max-w-none overflow-hidden"
+          style={{ width: `${zoom * 100}%`, minWidth: '100%', aspectRatio: '16 / 9' }}
+        >
         {/* IMAGE */}
         <img
           src={layoutImage}
@@ -213,6 +388,7 @@ export default function PlotOverlayEditor({
         {hoveredPlot && !editMode && (
           <PlotTooltip plot={hoveredPlot} position={tooltipPosition} />
         )}
+        </div>
       </div>
 
       {selectedPlot && (

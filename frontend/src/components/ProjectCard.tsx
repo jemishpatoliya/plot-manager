@@ -201,7 +201,7 @@ export default function ProjectCard({ project, onClick }: ProjectCardProps) {
           <div className="absolute inset-0 bg-gradient-to-t from-card via-card/20 to-transparent" />
           
           {/* Stats Overlay */}
-          <div className="absolute bottom-4 left-4 right-4 flex gap-2">
+          <div className="absolute bottom-4 left-4 right-4 flex flex-wrap gap-2">
             <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-status-available/20 border border-status-available/40">
               <span className="w-2 h-2 rounded-full bg-status-available" />
               <span className="text-xs font-medium text-foreground">{plotStats.available}</span>
@@ -223,19 +223,19 @@ export default function ProjectCard({ project, onClick }: ProjectCardProps) {
             {project.name}
           </h3>
           
-          <div className="space-y-2 text-sm">
-            <div className="flex items-center gap-2 text-muted-foreground">
+          <div className="space-y-2 text-sm min-w-0">
+            <div className="flex items-center gap-2 text-muted-foreground min-w-0">
               <MapPin className="w-4 h-4" />
-              <span>{project.location}</span>
+              <span className="truncate">{project.location}</span>
             </div>
             <div className="flex items-center gap-2 text-muted-foreground">
               <Grid3X3 className="w-4 h-4" />
               <span>{plotStats.total} Plots</span>
             </div>
             {project.contactDetails && (
-              <div className="flex items-center gap-2 text-muted-foreground">
+              <div className="flex items-center gap-2 text-muted-foreground min-w-0">
                 <Phone className="w-4 h-4" />
-                <span>{project.contactDetails}</span>
+                <span className="truncate">{project.contactDetails}</span>
               </div>
             )}
             <div className="flex items-center gap-2 text-muted-foreground">

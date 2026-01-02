@@ -44,9 +44,6 @@ export default function Landing() {
               <Link to="/login">
                 <Button size="lg" className="w-full sm:w-auto">Login</Button>
               </Link>
-              <Link to="/register">
-                <Button size="lg" variant="outline" className="w-full sm:w-auto">Create account</Button>
-              </Link>
             </div>
 
             <div className="mt-8 space-y-3 text-sm text-muted-foreground">

@@ -9,7 +9,6 @@ import ProjectView from "./pages/ProjectView";
 import AradhanaMap from "./pages/AradhanaMap";
 import ProjectMap from "./pages/ProjectMap";
 import Login from "./pages/Login";
-import Register from "./pages/Register";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -28,7 +27,6 @@ const App = () => (
             <Route path="/project/:projectId/map" element={<ProjectMap />} />
             <Route path="/aradhana-map" element={<AradhanaMap />} />
             <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
