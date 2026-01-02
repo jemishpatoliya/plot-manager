@@ -23,6 +23,24 @@ const ADMIN_PASSWORD = 'admin@123';
 let dbReady = false;
 let dbInfo = { host: null, name: null };
 
+const sessions = new Map();
+
+const getBearerToken = (req) => {
+  const raw = String(req.headers?.authorization || '').trim();
+  if (!raw.toLowerCase().startsWith('bearer ')) return '';
+  return raw.slice(7).trim();
+};
+
+const requireAdmin = (req, res, next) => {
+  const token = getBearerToken(req);
+  if (!token) return res.status(401).json({ message: 'Unauthorized' });
+  const session = sessions.get(token);
+  if (!session) return res.status(401).json({ message: 'Unauthorized' });
+  if (session.role !== 'admin') return res.status(403).json({ message: 'Forbidden' });
+  req.auth = session;
+  next();
+};
+
 let s3Client = null;
 const getS3 = () => {
   if (s3Client) return s3Client;
@@ -120,6 +138,10 @@ app.get('/api/health', (_req, res) => {
 });
 
 app.post('/api/storage/presign-upload', async (req, res) => {
+  if (!dbReady) {
+    return res.status(503).json({ message: 'Database not connected' });
+  }
+  return requireAdmin(req, res, async () => {
   const s3 = getS3();
   if (!s3 || !S3_BUCKET) {
     return res.status(503).json({ message: 'Storage not configured' });
@@ -144,6 +166,7 @@ app.post('/api/storage/presign-upload', async (req, res) => {
 
   const url = await getSignedUrl(s3, cmd, { expiresIn: 60 });
   res.json({ key, url });
+  });
 });
 
 app.get('/api/storage/signed-url', async (req, res) => {
@@ -163,30 +186,8 @@ app.get('/api/storage/signed-url', async (req, res) => {
   res.json({ url });
 });
 
-app.post('/api/auth/register', async (req, res) => {
-  if (!dbReady) {
-    return res.status(503).json({ message: 'Database not connected' });
-  }
-
-  const email = String(req.body?.email || '').trim().toLowerCase();
-  const password = String(req.body?.password || '');
-
-  if (!email || !password) {
-    return res.status(400).json({ message: 'Email and password are required' });
-  }
-
-  if (email === ADMIN_EMAIL.toLowerCase()) {
-    return res.status(400).json({ message: 'This email is reserved' });
-  }
-
-  const exists = await User.findOne({ email }).lean();
-  if (exists) {
-    return res.status(409).json({ message: 'User already exists' });
-  }
-
-  const passwordHash = await bcrypt.hash(password, 10);
-  const created = await User.create({ email, passwordHash, role: 'user', createdAt: new Date() });
-  res.status(201).json({ id: created._id.toString(), email: created.email, role: created.role });
+app.post('/api/auth/register', (_req, res) => {
+  res.status(404).json({ message: 'Registration is disabled. Please login.' });
 });
 
 app.post('/api/auth/login', async (req, res) => {
@@ -202,7 +203,9 @@ app.post('/api/auth/login', async (req, res) => {
   }
 
   if (email === ADMIN_EMAIL.toLowerCase() && password === ADMIN_PASSWORD) {
-    return res.json({ id: 'admin', email, role: 'admin' });
+    const token = randomUUID();
+    sessions.set(token, { id: 'admin', email, role: 'admin' });
+    return res.json({ id: 'admin', email, role: 'admin', token });
   }
 
   const user = await User.findOne({ email });
@@ -215,7 +218,9 @@ app.post('/api/auth/login', async (req, res) => {
     return res.status(401).json({ message: 'Invalid credentials' });
   }
 
-  res.json({ id: user._id.toString(), email: user.email, role: user.role });
+  const token = randomUUID();
+  sessions.set(token, { id: user._id.toString(), email: user.email, role: user.role });
+  res.json({ id: user._id.toString(), email: user.email, role: user.role, token });
 });
 
 app.get('/api/projects', async (_req, res) => {
@@ -257,7 +262,7 @@ app.get('/api/projects/:id', async (req, res) => {
   res.json(project);
 });
 
-app.post('/api/projects', async (req, res) => {
+app.post('/api/projects', requireAdmin, async (req, res) => {
   if (!dbReady) {
     return res.status(503).json({ message: 'Database not connected' });
   }
@@ -268,7 +273,7 @@ app.post('/api/projects', async (req, res) => {
   res.status(201).json(doc);
 });
 
-app.put('/api/projects/:id', async (req, res) => {
+app.put('/api/projects/:id', requireAdmin, async (req, res) => {
   if (!dbReady) {
     return res.status(503).json({ message: 'Database not connected' });
   }
@@ -282,7 +287,7 @@ app.put('/api/projects/:id', async (req, res) => {
   res.json(updated);
 });
 
-app.delete('/api/projects/:id', async (req, res) => {
+app.delete('/api/projects/:id', requireAdmin, async (req, res) => {
   if (!dbReady) {
     return res.status(503).json({ message: 'Database not connected' });
   }
