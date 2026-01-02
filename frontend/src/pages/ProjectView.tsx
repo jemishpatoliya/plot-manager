@@ -9,6 +9,14 @@ import AddPlotDialog from '@/components/AddPlotDialog';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, MapPin, Grid3X3, Edit2, Eye } from 'lucide-react';
 
+const apiUrl = (path: string) => {
+  const base = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim();
+  if (!base) return path;
+  const baseNoSlash = base.endsWith('/') ? base.slice(0, -1) : base;
+  const pathWithSlash = path.startsWith('/') ? path : `/${path}`;
+  return `${baseNoSlash}${pathWithSlash}`;
+};
+
 export default function ProjectView() {
   const { projectId } = useParams<{ projectId: string }>();
   const { projects, currentProject, setCurrentProject, isAdmin } = useApp();
@@ -20,6 +28,17 @@ export default function ProjectView() {
       const project = projects.find((p) => p.id === projectId);
       if (project) {
         setCurrentProject(project);
+
+        if (!project.layoutImage) {
+          fetch(apiUrl(`/api/projects/${projectId}`))
+            .then((r) => (r.ok ? r.json() : null))
+            .then((full) => {
+              if (full && full.id === projectId) {
+                setCurrentProject(full);
+              }
+            })
+            .catch(() => {});
+        }
       } else {
         navigate('/');
       }

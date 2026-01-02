@@ -106,7 +106,7 @@ export default function ProjectCard({ project, onClick }: ProjectCardProps) {
         {/* Image Preview */}
         <div className="relative h-48 overflow-hidden">
           <img
-            src={project.layoutImage || sampleLayout}
+            src={(project.layoutImage && project.layoutImage.length > 0 ? project.layoutImage : sampleLayout)}
             alt={project.name}
             className="w-full h-full object-cover transform transition-transform duration-500 group-hover:scale-110"
           />

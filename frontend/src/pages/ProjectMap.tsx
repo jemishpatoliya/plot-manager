@@ -10,6 +10,14 @@ import { makeObjectUrlFromRef } from '@/lib/idbImageStore';
 
 type LngLatTuple = [number, number];
 
+const apiUrl = (path: string) => {
+  const base = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim();
+  if (!base) return path;
+  const baseNoSlash = base.endsWith('/') ? base.slice(0, -1) : base;
+  const pathWithSlash = path.startsWith('/') ? path : `/${path}`;
+  return `${baseNoSlash}${pathWithSlash}`;
+};
+
 type Corners4 = [[number, number], [number, number], [number, number], [number, number]];
 
 type CornerKey = 'lng' | 'lat';
@@ -78,6 +86,19 @@ export default function ProjectMap() {
     setCurrentProject(project);
     if (!project) {
       navigate('/');
+      return;
+    }
+
+    const hasImage = Boolean(project.layoutImage) || Boolean(project.mapConfig?.imageUrl);
+    if (!hasImage) {
+      fetch(apiUrl(`/api/projects/${projectId}`))
+        .then((r) => (r.ok ? r.json() : null))
+        .then((full) => {
+          if (full && full.id === projectId) {
+            setCurrentProject(full);
+          }
+        })
+        .catch(() => {});
     }
   }, [projectId, projects, setCurrentProject, navigate]);
 

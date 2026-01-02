@@ -29,6 +29,26 @@ const apiUrl = (path: string) => {
   return `${baseNoSlash}${pathWithSlash}`;
 };
 
+const stripHeavyFields = (p: Project): Project => {
+  const next: Project = { ...p };
+
+  if (typeof next.layoutImage === 'string') {
+    const s = next.layoutImage;
+    if (s.startsWith('data:image/') || s.length > 50_000) {
+      next.layoutImage = '';
+    }
+  }
+
+  if (next.mapConfig?.imageUrl && typeof next.mapConfig.imageUrl === 'string') {
+    const s = next.mapConfig.imageUrl;
+    if (s.startsWith('data:image/') || s.length > 50_000) {
+      next.mapConfig = { ...next.mapConfig, imageUrl: '' };
+    }
+  }
+
+  return next;
+};
+
 // Fixed admin credentials
 const ADMIN_EMAIL = 'admin@gmail.com';
 const ADMIN_PASSWORD = 'admin@123';
@@ -116,7 +136,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     try {
-      localStorage.setItem('realestate-projects', JSON.stringify(projects));
+      const light = projects.map(stripHeavyFields);
+      localStorage.setItem('realestate-projects', JSON.stringify(light));
     } catch {
       // ignore quota errors to avoid crashing the app
     }

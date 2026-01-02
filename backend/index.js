@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
+import compression from 'compression';
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 
@@ -79,6 +80,7 @@ const Project = mongoose.model('Project', ProjectSchema);
 const app = express();
 
 app.use(cors());
+app.use(compression());
 app.use(express.json({ limit: '25mb' }));
 
 app.get('/api/health', (_req, res) => {
@@ -145,7 +147,28 @@ app.get('/api/projects', async (_req, res) => {
     return res.status(503).json({ message: 'Database not connected' });
   }
   const projects = await Project.find({}).lean();
-  res.json(projects);
+  const light = projects.map((p) => {
+    const next = { ...p };
+    if (typeof next.layoutImage === 'string') next.layoutImage = '';
+    if (next.mapConfig && typeof next.mapConfig === 'object') {
+      next.mapConfig = { ...next.mapConfig };
+      if (typeof next.mapConfig.imageUrl === 'string') next.mapConfig.imageUrl = '';
+    }
+    return next;
+  });
+  res.json(light);
+});
+
+app.get('/api/projects/:id', async (req, res) => {
+  if (!dbReady) {
+    return res.status(503).json({ message: 'Database not connected' });
+  }
+  const { id } = req.params;
+  const project = await Project.findOne({ id }).lean();
+  if (!project) {
+    return res.status(404).json({ message: 'Project not found' });
+  }
+  res.json(project);
 });
 
 app.post('/api/projects', async (req, res) => {
