@@ -135,10 +135,13 @@ export default function ProjectMap() {
 
     (async () => {
       setIsImageLoading(true);
+      console.log('Starting image resolution for:', imageUrl);
       try {
         const url = await makeObjectUrlFromRef(imageUrl);
         if (cancelled) return;
         nextObjectUrl = url;
+        
+        console.log('Image resolution result:', url);
         
         // If URL resolution failed, use fallback
         if (!url && imageUrl.startsWith('s3:')) {
@@ -224,13 +227,18 @@ export default function ProjectMap() {
     const LAYER_ID = 'project-image-layer';
 
     const applyUpdate = () => {
+      console.log('Map applyUpdate called:', { imageUrl, isImageLoading, resolvedImageUrl });
+      
       if (!imageUrl || isImageLoading || !resolvedImageUrl) {
+        console.log('Skipping map update - conditions not met:', { imageUrl, isImageLoading, resolvedImageUrl });
         if (map.getLayer(LAYER_ID)) map.removeLayer(LAYER_ID);
         if (map.getSource(SOURCE_ID)) map.removeSource(SOURCE_ID);
         markersRef.current.forEach((m) => m.remove());
         markersRef.current = [];
         return;
       }
+
+      console.log('Proceeding with map update, resolvedImageUrl:', resolvedImageUrl);
 
       const orderedRaw = orderImageCoords(rawCorners);
       const coords = applyCornerFlip(orderedRaw, flipH, flipV);
@@ -242,11 +250,13 @@ export default function ProjectMap() {
 
         if (src && (canUpdateImage || canSetCoordinates)) {
           if (canUpdateImage) {
+            console.log('Updating existing image source with URL:', resolvedImageUrl);
             src.updateImage?.({ url: resolvedImageUrl, coordinates: coords });
           } else {
             src.setCoordinates?.(coords);
             if (map.getLayer(LAYER_ID)) map.removeLayer(LAYER_ID);
             map.removeSource(SOURCE_ID);
+            console.log('Adding new image source with URL:', resolvedImageUrl);
             map.addSource(SOURCE_ID, {
               type: 'image',
               url: resolvedImageUrl,
@@ -256,6 +266,7 @@ export default function ProjectMap() {
         } else {
           if (map.getLayer(LAYER_ID)) map.removeLayer(LAYER_ID);
           if (map.getSource(SOURCE_ID)) map.removeSource(SOURCE_ID);
+          console.log('Adding new image source with URL:', resolvedImageUrl);
           map.addSource(SOURCE_ID, {
             type: 'image',
             url: resolvedImageUrl,
