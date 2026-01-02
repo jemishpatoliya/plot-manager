@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { useState } from 'react';
 
 const Index = () => {
-  const { projects, setCurrentProject, isAdmin } = useApp();
+  const { projects, setCurrentProject, isAdmin, isInitialized } = useApp();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -28,19 +28,36 @@ const Index = () => {
       <Header />
 
       <main className="container px-4 py-8">
-        {/* Hero Section */}
-        <div className="text-center mb-12">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 mb-6">
-            <Building2 className="w-4 h-4 text-primary" />
-            <span className="text-sm font-medium text-primary">Real Estate Management</span>
+        {/* Show loading skeleton only during initialization */}
+        {!isInitialized && (
+          <div className="space-y-8">
+            <div className="text-center mb-12">
+              <div className="h-12 bg-muted rounded-lg w-64 mx-auto mb-4 animate-pulse" />
+              <div className="h-8 bg-muted rounded-lg w-96 mx-auto animate-pulse" />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="h-80 bg-muted rounded-2xl animate-pulse" />
+              ))}
+            </div>
           </div>
-          <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-4">
-            Plot Management <span className="text-gradient">System</span>
-          </h1>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Manage your real estate projects with interactive layouts, real-time status tracking, and comprehensive plot details.
-          </p>
-        </div>
+        )}
+
+        {/* Actual content (hidden during initialization) */}
+        <div className={!isInitialized ? 'invisible' : ''}>
+          {/* Hero Section */}
+          <div className="text-center mb-12">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 mb-6">
+              <Building2 className="w-4 h-4 text-primary" />
+              <span className="text-sm font-medium text-primary">Real Estate Management</span>
+            </div>
+            <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-4">
+              Plot Management <span className="text-gradient">System</span>
+            </h1>
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+              Manage your real estate projects with interactive layouts, real-time status tracking, and comprehensive plot details.
+            </p>
+          </div>
 
         {/* Actions Bar */}
         <div className="flex flex-col sm:flex-row gap-4 mb-8">
@@ -113,6 +130,7 @@ const Index = () => {
             </div>
           </div>
         )}
+        </div>
       </main>
 
       {/* Footer */}

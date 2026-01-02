@@ -42,6 +42,12 @@ const openDb = () =>
 
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
+    
+    // Add timeout to prevent hanging
+    setTimeout(() => {
+      if (req.result) return;
+      reject(new Error('IndexedDB initialization timeout'));
+    }, 5000);
   });
 
 const withStore = async <T>(mode: IDBTransactionMode, fn: (store: IDBObjectStore) => IDBRequest<T>) => {
@@ -81,14 +87,20 @@ export const storeDataUrlImage = async (dataUrl: string, key: string) => {
 };
 
 export const makeObjectUrlFromRef = async (ref: string) => {
-  if (ref.startsWith('s3:')) {
-    return getSignedUrlForS3Ref(ref);
+  try {
+    if (ref.startsWith('s3:')) {
+      return await getSignedUrlForS3Ref(ref);
+    }
+    if (!ref.startsWith('idb:')) return ref;
+    
+    const key = ref.slice(4);
+    const blob = await getImageBlob(key);
+    if (!blob) {
+      throw new Error('Image not found in IndexedDB');
+    }
+    return URL.createObjectURL(blob);
+  } catch (error) {
+    console.warn('Failed to resolve image reference:', ref, error);
+    throw error;
   }
-  if (!ref.startsWith('idb:')) return ref;
-  const key = ref.slice(4);
-  const blob = await getImageBlob(key);
-  if (!blob) {
-    throw new Error('Image not found');
-  }
-  return URL.createObjectURL(blob);
 };

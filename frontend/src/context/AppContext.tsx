@@ -7,6 +7,7 @@ interface AppContextType {
   currentProject: Project | null;
   user: User | null;
   isAdmin: boolean;
+  isInitialized: boolean;
   setCurrentProject: (project: Project | null) => void;
   register: (email: string, password: string) => Promise<boolean>;
   login: (email: string, password: string) => Promise<boolean>;
@@ -62,6 +63,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   });
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
   const [apiAvailable, setApiAvailable] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
   const [user, setUser] = useState<User | null>(() => {
     const saved = localStorage.getItem('realestate-user');
     return saved ? JSON.parse(saved) : null;
@@ -78,6 +80,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (!healthJson?.dbReady) {
           if (cancelled) return;
           setApiAvailable(false);
+          setIsInitialized(true);
           return;
         }
         if (cancelled) return;
@@ -93,6 +96,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       } catch {
         if (cancelled) return;
         setApiAvailable(false);
+      } finally {
+        if (!cancelled) {
+          setIsInitialized(true);
+        }
       }
     })();
 
@@ -342,6 +349,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         currentProject,
         user,
         isAdmin: user?.role === 'admin',
+        isInitialized,
         setCurrentProject,
         register,
         login,

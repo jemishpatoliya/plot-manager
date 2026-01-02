@@ -33,6 +33,8 @@ export default function ProjectCard({ project, onClick }: ProjectCardProps) {
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [resolvedLayoutImage, setResolvedLayoutImage] = useState<string>(sampleLayout);
+  const [imageLoading, setImageLoading] = useState(true);
+  const [imageError, setImageError] = useState(false);
   const objectUrlRef = useRef<string | null>(null);
   const [editForm, setEditForm] = useState({
     name: project.name,
@@ -44,10 +46,23 @@ export default function ProjectCard({ project, onClick }: ProjectCardProps) {
   useEffect(() => {
     let cancelled = false;
 
-    (async () => {
+    const loadImage = async () => {
+      setImageLoading(true);
+      setImageError(false);
+      
       try {
         const raw = project.layoutImage;
-        const next = raw ? await makeObjectUrlFromRef(raw) : '';
+        
+        // If no custom image, use sample layout immediately
+        if (!raw) {
+          if (cancelled) return;
+          setResolvedLayoutImage(sampleLayout);
+          setImageLoading(false);
+          return;
+        }
+
+        // Try to resolve the custom image
+        const next = await makeObjectUrlFromRef(raw);
         if (cancelled) return;
 
         if (next && next.startsWith('blob:')) {
@@ -60,12 +75,19 @@ export default function ProjectCard({ project, onClick }: ProjectCardProps) {
           objectUrlRef.current = null;
         }
 
+        if (cancelled) return;
         setResolvedLayoutImage(next || sampleLayout);
-      } catch {
+        setImageLoading(false);
+      } catch (error) {
+        console.warn('Failed to load project image:', error);
         if (cancelled) return;
         setResolvedLayoutImage(sampleLayout);
+        setImageError(true);
+        setImageLoading(false);
       }
-    })();
+    };
+
+    loadImage();
 
     return () => {
       cancelled = true;
@@ -146,11 +168,24 @@ export default function ProjectCard({ project, onClick }: ProjectCardProps) {
         )}
 
         {/* Image Preview */}
-        <div className="relative h-48 overflow-hidden">
+        <div className="relative h-48 overflow-hidden bg-muted/20">
+          {imageLoading && (
+            <div className="absolute inset-0 flex items-center justify-center bg-muted/30">
+              <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            </div>
+          )}
           <img
             src={resolvedLayoutImage}
             alt={project.name}
-            className="w-full h-full object-cover transform transition-transform duration-500 group-hover:scale-110"
+            className={`w-full h-full object-cover transform transition-all duration-500 group-hover:scale-110 ${
+              imageLoading ? 'opacity-0' : 'opacity-100'
+            }`}
+            onLoad={() => setImageLoading(false)}
+            onError={() => {
+              setImageError(true);
+              setImageLoading(false);
+              setResolvedLayoutImage(sampleLayout);
+            }}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-card via-card/20 to-transparent" />
           
