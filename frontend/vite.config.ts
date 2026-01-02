@@ -18,10 +18,7 @@ export default defineConfig(({ mode }) => {
     },
     preview: {
       host: true,
-      allowedHosts: [
-        'plot-manager-production.up.railway.app',
-        '.up.railway.app',
-      ],
+      allowedHosts: true,
     },
     plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
     resolve: {
