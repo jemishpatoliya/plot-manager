@@ -192,32 +192,16 @@ export default function ProjectView() {
           </div>
         </div>
 
-        {/* Empty State for New Projects */}
-        {currentProject.plots.length === 0 ? (
-          <div className="bg-card border border-border rounded-2xl p-8 shadow-sm text-center">
-            <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
-              <Grid3X3 className="w-8 h-8 text-muted-foreground" />
-            </div>
-            <h3 className="text-xl font-semibold text-foreground mb-2">No plots yet</h3>
-            <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-              {isAdmin 
-                ? 'Start by adding plots to this project. Click "Add Plot" to create your first plot overlay.'
-                : 'No plots have been added to this project yet.'}
-            </p>
-            {isAdmin && <AddPlotDialog projectId={currentProject.id} />}
-          </div>
-        ) : (
-          /* Layout Viewer */
-          <div className="bg-card border border-border rounded-2xl sm:p-4 overflow-hidden shadow-sm -mx-4 px-4 sm:mx-0 sm:px-0">
-            <PlotOverlayEditor
-              layoutImage={resolvedLayoutImage || currentProject.layoutImage}
-              plots={currentProject.plots}
-              projectId={currentProject.id}
-              project={currentProject}
-              editMode={editMode}
-            />
-          </div>
-        )}
+        {/* Layout Viewer */}
+        <div className="bg-card border border-border rounded-2xl sm:p-4 overflow-hidden shadow-sm -mx-4 px-4 sm:mx-0 sm:px-0">
+          <PlotOverlayEditor
+            layoutImage={resolvedLayoutImage || currentProject.layoutImage}
+            plots={currentProject.plots}
+            projectId={currentProject.id}
+            project={currentProject}
+            editMode={editMode}
+          />
+        </div>
 
         {/* Instructions */}
         <div className="mt-6 p-4 rounded-xl bg-secondary border border-border">

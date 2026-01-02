@@ -89,8 +89,8 @@ export default function ProjectMap() {
       return;
     }
 
-    const hasImage = Boolean(project.layoutImage) || Boolean(project.mapConfig?.imageUrl);
-    if (!hasImage) {
+    const needsFullProject = !project.mapConfig;
+    if (needsFullProject) {
       fetch(apiUrl(`/api/projects/${projectId}`))
         .then((r) => (r.ok ? r.json() : null))
         .then((full) => {
@@ -444,7 +444,7 @@ export default function ProjectMap() {
     );
   }
 
-  if (!isAdmin && !currentProject.mapConfig) {
+  if (!isAdmin && !currentProject.mapConfig && !currentProject.layoutImage) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-6">
         <div className="max-w-lg text-center">
