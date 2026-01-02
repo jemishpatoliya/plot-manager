@@ -309,19 +309,32 @@ export default function ProjectMap() {
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result;
-      if (typeof result !== 'string') {
-        toast.error('Could not read image');
-        return;
+    (async () => {
+      try {
+        const extRaw = file.name.split('.').pop() || '';
+        const ext = extRaw.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+        const presign = await fetch(apiUrl('/api/storage/presign-upload'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ contentType: file.type, prefix: 'project-maps', ext }),
+        });
+        if (!presign.ok) throw new Error('Could not prepare upload');
+        const presignJson = (await presign.json()) as { key?: string; url?: string };
+        if (!presignJson?.key || !presignJson?.url) throw new Error('Could not prepare upload');
+
+        const put = await fetch(presignJson.url, {
+          method: 'PUT',
+          headers: { 'Content-Type': file.type },
+          body: file,
+        });
+        if (!put.ok) throw new Error('Upload failed');
+
+        setImageUrl(`s3:${presignJson.key}`);
+      } catch {
+        toast.error('Image upload failed');
       }
-      setImageUrl(result);
-    };
-    reader.onerror = () => {
-      toast.error('Could not read image');
-    };
-    reader.readAsDataURL(file);
+    })();
   };
 
   const updateCorner = (idx: number, key: CornerKey, value: string) => {

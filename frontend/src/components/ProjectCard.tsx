@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Project } from '@/types';
 import { useApp } from '@/context/AppContext';
 import { MapPin, Calendar, Grid3X3, MoreVertical, Edit2, Trash2, Phone } from 'lucide-react';
 import { formatDate } from '@/lib/plotUtils';
 import { Button } from '@/components/ui/button';
 import sampleLayout from '@/assets/sample-layout.png';
+import { makeObjectUrlFromRef } from '@/lib/idbImageStore';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,12 +32,53 @@ export default function ProjectCard({ project, onClick }: ProjectCardProps) {
   const { isAdmin, updateProject, deleteProject } = useApp();
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [resolvedLayoutImage, setResolvedLayoutImage] = useState<string>(sampleLayout);
+  const objectUrlRef = useRef<string | null>(null);
   const [editForm, setEditForm] = useState({
     name: project.name,
     location: project.location,
     description: project.description || '',
     contactDetails: project.contactDetails || '',
   });
+
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const raw = project.layoutImage;
+        const next = raw ? await makeObjectUrlFromRef(raw) : '';
+        if (cancelled) return;
+
+        if (next && next.startsWith('blob:')) {
+          if (objectUrlRef.current && objectUrlRef.current !== next) {
+            URL.revokeObjectURL(objectUrlRef.current);
+          }
+          objectUrlRef.current = next;
+        } else if (objectUrlRef.current) {
+          URL.revokeObjectURL(objectUrlRef.current);
+          objectUrlRef.current = null;
+        }
+
+        setResolvedLayoutImage(next || sampleLayout);
+      } catch {
+        if (cancelled) return;
+        setResolvedLayoutImage(sampleLayout);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [project.layoutImage]);
+
+  useEffect(() => {
+    return () => {
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current);
+      }
+    };
+  }, []);
 
   const plotStats = {
     total: project.plots.length,
@@ -106,7 +148,7 @@ export default function ProjectCard({ project, onClick }: ProjectCardProps) {
         {/* Image Preview */}
         <div className="relative h-48 overflow-hidden">
           <img
-            src={(project.layoutImage && project.layoutImage.length > 0 ? project.layoutImage : sampleLayout)}
+            src={resolvedLayoutImage}
             alt={project.name}
             className="w-full h-full object-cover transform transition-transform duration-500 group-hover:scale-110"
           />

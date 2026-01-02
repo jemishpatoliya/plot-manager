@@ -2,6 +2,33 @@ const DB_NAME = 'plotperfect-db';
 const DB_VERSION = 1;
 const STORE_NAME = 'images';
 
+const apiUrl = (path: string) => {
+  const base = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim();
+  if (!base) return path;
+  const baseNoSlash = base.endsWith('/') ? base.slice(0, -1) : base;
+  const pathWithSlash = path.startsWith('/') ? path : `/${path}`;
+  return `${baseNoSlash}${pathWithSlash}`;
+};
+
+const signedUrlCache = new Map<string, { url: string; expiresAt: number }>();
+
+const getSignedUrlForS3Ref = async (ref: string) => {
+  const cached = signedUrlCache.get(ref);
+  if (cached && Date.now() < cached.expiresAt) return cached.url;
+
+  const res = await fetch(
+    apiUrl(`/api/storage/signed-url?key=${encodeURIComponent(ref)}`)
+  );
+  if (!res.ok) {
+    throw new Error('Could not resolve image');
+  }
+  const data = (await res.json()) as { url?: string };
+  if (!data?.url) throw new Error('Could not resolve image');
+
+  signedUrlCache.set(ref, { url: data.url, expiresAt: Date.now() + 4 * 60 * 1000 });
+  return data.url;
+};
+
 const openDb = () =>
   new Promise<IDBDatabase>((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
@@ -54,6 +81,9 @@ export const storeDataUrlImage = async (dataUrl: string, key: string) => {
 };
 
 export const makeObjectUrlFromRef = async (ref: string) => {
+  if (ref.startsWith('s3:')) {
+    return getSignedUrlForS3Ref(ref);
+  }
   if (!ref.startsWith('idb:')) return ref;
   const key = ref.slice(4);
   const blob = await getImageBlob(key);

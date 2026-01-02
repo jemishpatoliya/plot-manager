@@ -38,8 +38,39 @@ export default function AdminProjectActions({ project }: AdminProjectActionsProp
   });
   
   const [newLayoutImage, setNewLayoutImage] = useState<string>('');
+  const [newLayoutFile, setNewLayoutFile] = useState<File | null>(null);
   const [fileName, setFileName] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const apiUrl = (path: string) => {
+    const base = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim();
+    if (!base) return path;
+    const baseNoSlash = base.endsWith('/') ? base.slice(0, -1) : base;
+    const pathWithSlash = path.startsWith('/') ? path : `/${path}`;
+    return `${baseNoSlash}${pathWithSlash}`;
+  };
+
+  const uploadImageToStorage = async (file: File, prefix: string) => {
+    const extRaw = file.name.split('.').pop() || '';
+    const ext = extRaw.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+    const presign = await fetch(apiUrl('/api/storage/presign-upload'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contentType: file.type, prefix, ext }),
+    });
+    if (!presign.ok) throw new Error('Could not prepare upload');
+    const presignJson = (await presign.json()) as { key?: string; url?: string };
+    if (!presignJson?.key || !presignJson?.url) throw new Error('Could not prepare upload');
+
+    const put = await fetch(presignJson.url, {
+      method: 'PUT',
+      headers: { 'Content-Type': file.type },
+      body: file,
+    });
+    if (!put.ok) throw new Error('Upload failed');
+    return `s3:${presignJson.key}`;
+  };
 
   if (!isAdmin) return null;
 
@@ -68,6 +99,7 @@ export default function AdminProjectActions({ project }: AdminProjectActionsProp
         return;
       }
       setFileName(file.name);
+      setNewLayoutFile(file);
       const reader = new FileReader();
       reader.onload = (event) => {
         setNewLayoutImage(event.target?.result as string);
@@ -76,15 +108,24 @@ export default function AdminProjectActions({ project }: AdminProjectActionsProp
     }
   };
 
-  const handleImageSave = () => {
-    if (!newLayoutImage) {
+  const handleImageSave = async () => {
+    if (!newLayoutImage || !newLayoutFile) {
       toast.error('Please select an image');
       return;
     }
-    updateProject(project.id, { layoutImage: newLayoutImage });
+
+    try {
+      const ref = await uploadImageToStorage(newLayoutFile, 'project-layouts');
+      updateProject(project.id, { layoutImage: ref });
+    } catch {
+      toast.error('Image upload failed');
+      return;
+    }
+
     toast.success('Layout image updated successfully');
     setShowImageDialog(false);
     setNewLayoutImage('');
+    setNewLayoutFile(null);
     setFileName('');
   };
 

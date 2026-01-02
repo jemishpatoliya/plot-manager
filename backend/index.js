@@ -2,17 +2,48 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import compression from 'compression';
+import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
+import { randomUUID } from 'crypto';
 
 const PORT = process.env.PORT || 5000;
 const MONGODB_URI = process.env.MONGODB_URI;
+
+const S3_ENDPOINT = process.env.S3_ENDPOINT;
+const S3_REGION = process.env.S3_REGION || 'us-east-1';
+const S3_BUCKET = process.env.S3_BUCKET;
+const S3_ACCESS_KEY_ID = process.env.S3_ACCESS_KEY_ID;
+const S3_SECRET_ACCESS_KEY = process.env.S3_SECRET_ACCESS_KEY;
 
 const ADMIN_EMAIL = 'admin@gmail.com';
 const ADMIN_PASSWORD = 'admin@123';
 
 let dbReady = false;
 let dbInfo = { host: null, name: null };
+
+let s3Client = null;
+const getS3 = () => {
+  if (s3Client) return s3Client;
+  if (!S3_ENDPOINT || !S3_BUCKET || !S3_ACCESS_KEY_ID || !S3_SECRET_ACCESS_KEY) return null;
+
+  s3Client = new S3Client({
+    region: S3_REGION,
+    endpoint: S3_ENDPOINT,
+    credentials: {
+      accessKeyId: S3_ACCESS_KEY_ID,
+      secretAccessKey: S3_SECRET_ACCESS_KEY,
+    },
+    forcePathStyle: true,
+  });
+  return s3Client;
+};
+
+const isAllowedImageType = (contentType) => {
+  if (!contentType) return false;
+  return contentType === 'image/png' || contentType === 'image/jpeg' || contentType === 'image/webp';
+};
 
 const UserSchema = new mongoose.Schema(
   {
@@ -84,7 +115,52 @@ app.use(compression());
 app.use(express.json({ limit: '25mb' }));
 
 app.get('/api/health', (_req, res) => {
-  res.json({ ok: true, dbReady, db: dbInfo });
+  const storageReady = Boolean(getS3());
+  res.json({ ok: true, dbReady, db: dbInfo, storageReady });
+});
+
+app.post('/api/storage/presign-upload', async (req, res) => {
+  const s3 = getS3();
+  if (!s3 || !S3_BUCKET) {
+    return res.status(503).json({ message: 'Storage not configured' });
+  }
+
+  const contentType = String(req.body?.contentType || '').trim().toLowerCase();
+  const prefix = String(req.body?.prefix || 'uploads').trim().replace(/[^a-z0-9/_-]/gi, '');
+  const ext = String(req.body?.ext || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+
+  if (!isAllowedImageType(contentType)) {
+    return res.status(400).json({ message: 'Unsupported content type' });
+  }
+
+  const safeExt = ext || (contentType === 'image/png' ? 'png' : contentType === 'image/webp' ? 'webp' : 'jpg');
+  const key = `${prefix}/${Date.now()}-${randomUUID()}.${safeExt}`;
+
+  const cmd = new PutObjectCommand({
+    Bucket: S3_BUCKET,
+    Key: key,
+    ContentType: contentType,
+  });
+
+  const url = await getSignedUrl(s3, cmd, { expiresIn: 60 });
+  res.json({ key, url });
+});
+
+app.get('/api/storage/signed-url', async (req, res) => {
+  const s3 = getS3();
+  if (!s3 || !S3_BUCKET) {
+    return res.status(503).json({ message: 'Storage not configured' });
+  }
+
+  const rawKey = String(req.query?.key || '').trim();
+  const key = rawKey.startsWith('s3:') ? rawKey.slice(3) : rawKey;
+  if (!key) {
+    return res.status(400).json({ message: 'Missing key' });
+  }
+
+  const cmd = new GetObjectCommand({ Bucket: S3_BUCKET, Key: key });
+  const url = await getSignedUrl(s3, cmd, { expiresIn: 300 });
+  res.json({ url });
 });
 
 app.post('/api/auth/register', async (req, res) => {
@@ -149,10 +225,20 @@ app.get('/api/projects', async (_req, res) => {
   const projects = await Project.find({}).lean();
   const light = projects.map((p) => {
     const next = { ...p };
-    if (typeof next.layoutImage === 'string') next.layoutImage = '';
+    if (typeof next.layoutImage === 'string') {
+      const s = next.layoutImage;
+      if (s.startsWith('data:image/') || s.startsWith('idb:') || s.length > 50_000) {
+        next.layoutImage = '';
+      }
+    }
     if (next.mapConfig && typeof next.mapConfig === 'object') {
       next.mapConfig = { ...next.mapConfig };
-      if (typeof next.mapConfig.imageUrl === 'string') next.mapConfig.imageUrl = '';
+      if (typeof next.mapConfig.imageUrl === 'string') {
+        const s = next.mapConfig.imageUrl;
+        if (s.startsWith('data:image/') || s.startsWith('idb:') || s.length > 50_000) {
+          next.mapConfig.imageUrl = '';
+        }
+      }
     }
     return next;
   });

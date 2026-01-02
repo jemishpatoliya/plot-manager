@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useApp } from '@/context/AppContext';
 import Header from '@/components/Header';
@@ -8,6 +8,7 @@ import AdminProjectActions from '@/components/AdminProjectActions';
 import AddPlotDialog from '@/components/AddPlotDialog';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, MapPin, Grid3X3, Edit2, Eye } from 'lucide-react';
+import { makeObjectUrlFromRef } from '@/lib/idbImageStore';
 
 const apiUrl = (path: string) => {
   const base = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim();
@@ -22,6 +23,8 @@ export default function ProjectView() {
   const { projects, currentProject, setCurrentProject, isAdmin } = useApp();
   const navigate = useNavigate();
   const [editMode, setEditMode] = useState(false);
+  const [resolvedLayoutImage, setResolvedLayoutImage] = useState<string>('');
+  const objectUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (projectId) {
@@ -44,6 +47,50 @@ export default function ProjectView() {
       }
     }
   }, [projectId, projects, setCurrentProject, navigate]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const raw = currentProject?.layoutImage || '';
+        if (!raw) {
+          if (!cancelled) setResolvedLayoutImage('');
+          return;
+        }
+
+        const next = await makeObjectUrlFromRef(raw);
+        if (cancelled) return;
+
+        if (next && next.startsWith('blob:')) {
+          if (objectUrlRef.current && objectUrlRef.current !== next) {
+            URL.revokeObjectURL(objectUrlRef.current);
+          }
+          objectUrlRef.current = next;
+        } else if (objectUrlRef.current) {
+          URL.revokeObjectURL(objectUrlRef.current);
+          objectUrlRef.current = null;
+        }
+
+        setResolvedLayoutImage(next);
+      } catch {
+        if (cancelled) return;
+        setResolvedLayoutImage('');
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentProject?.layoutImage]);
+
+  useEffect(() => {
+    return () => {
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current);
+      }
+    };
+  }, []);
 
   if (!currentProject) {
     return (
@@ -163,7 +210,7 @@ export default function ProjectView() {
           /* Layout Viewer */
           <div className="bg-card border border-border rounded-2xl sm:p-4 overflow-hidden shadow-sm -mx-4 px-4 sm:mx-0 sm:px-0">
             <PlotOverlayEditor
-              layoutImage={currentProject.layoutImage}
+              layoutImage={resolvedLayoutImage || currentProject.layoutImage}
               plots={currentProject.plots}
               projectId={currentProject.id}
               project={currentProject}

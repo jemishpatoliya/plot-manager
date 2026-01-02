@@ -20,8 +20,44 @@ export default function CreateProjectDialog({ onProjectCreated }: CreateProjectD
   const [description, setDescription] = useState('');
   const [contactDetails, setContactDetails] = useState('');
   const [layoutImage, setLayoutImage] = useState<string>('');
+  const [layoutFile, setLayoutFile] = useState<File | null>(null);
   const [fileName, setFileName] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const apiUrl = (path: string) => {
+    const base = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim();
+    if (!base) return path;
+    const baseNoSlash = base.endsWith('/') ? base.slice(0, -1) : base;
+    const pathWithSlash = path.startsWith('/') ? path : `/${path}`;
+    return `${baseNoSlash}${pathWithSlash}`;
+  };
+
+  const uploadImageToStorage = async (file: File, prefix: string) => {
+    const extRaw = file.name.split('.').pop() || '';
+    const ext = extRaw.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+    const presign = await fetch(apiUrl('/api/storage/presign-upload'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contentType: file.type, prefix, ext }),
+    });
+    if (!presign.ok) {
+      throw new Error('Could not prepare upload');
+    }
+    const presignJson = (await presign.json()) as { key?: string; url?: string };
+    if (!presignJson?.key || !presignJson?.url) throw new Error('Could not prepare upload');
+
+    const put = await fetch(presignJson.url, {
+      method: 'PUT',
+      headers: { 'Content-Type': file.type },
+      body: file,
+    });
+    if (!put.ok) {
+      throw new Error('Upload failed');
+    }
+
+    return `s3:${presignJson.key}`;
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -32,6 +68,7 @@ export default function CreateProjectDialog({ onProjectCreated }: CreateProjectD
       }
 
       setFileName(file.name);
+      setLayoutFile(file);
       const reader = new FileReader();
       reader.onload = (event) => {
         setLayoutImage(event.target?.result as string);
@@ -40,7 +77,7 @@ export default function CreateProjectDialog({ onProjectCreated }: CreateProjectD
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!name.trim()) {
@@ -53,12 +90,24 @@ export default function CreateProjectDialog({ onProjectCreated }: CreateProjectD
       return;
     }
 
+    let storedLayoutImage = sampleLayout;
+    if (layoutFile) {
+      try {
+        storedLayoutImage = await uploadImageToStorage(layoutFile, 'project-layouts');
+      } catch {
+        toast.error('Image upload failed');
+        return;
+      }
+    } else if (layoutImage) {
+      storedLayoutImage = layoutImage;
+    }
+
     addProject({
       name: name.trim(),
       location: location.trim(),
       description: description.trim() || undefined,
       contactDetails: contactDetails.trim() || undefined,
-      layoutImage: layoutImage || sampleLayout,
+      layoutImage: storedLayoutImage,
     });
 
     toast.success('Project created successfully!');
@@ -68,6 +117,7 @@ export default function CreateProjectDialog({ onProjectCreated }: CreateProjectD
     setDescription('');
     setContactDetails('');
     setLayoutImage('');
+    setLayoutFile(null);
     setFileName('');
     onProjectCreated?.();
   };
